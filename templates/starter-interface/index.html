@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snailshell</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo">🐌 <b>Snailshell</b></div>
+    <div class="spacer"></div>
+    <button onclick="snailshell.app.reload()" title="Reload">⟳</button>
+    <button onclick="snailshell.app.devtools()" title="DevTools">{ }</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>System</h2>
+      <pre id="info">loading...</pre>
+    </section>
+
+    <section class="card">
+      <h2>Terminal</h2>
+      <div class="row">
+        <input id="cmd" placeholder="type a command, e.g. dir  or  ipconfig" autofocus>
+        <button id="run">Run</button>
+      </div>
+      <pre id="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Files</h2>
+      <div class="row">
+        <button id="pick">Pick a file…</button>
+        <span id="picked" class="muted"></span>
+      </div>
+      <pre id="preview"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Make it yours</h2>
+      <p class="muted">Edit anything in the <code>interface</code> folder — Snailshell reloads automatically.
+      Use <code>window.snailshell</code> to reach the system.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

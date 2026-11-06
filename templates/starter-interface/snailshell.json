@@ -1,0 +1,9 @@
+{
+  "width": 1100,
+  "height": 720,
+  "frameless": false,
+  "entry": "index.html",
+  "alwaysOnTop": false,
+  "hideMenu": true,
+  "devtools": false
+}
