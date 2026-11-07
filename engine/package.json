@@ -1,0 +1,17 @@
+{
+  "name": "snailshell-engine",
+  "productName": "Snailshell",
+  "version": "1.0.0",
+  "description": "Snailshell - a system application whose interface is whatever you put in the interface/ folder.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "node scripts/build.js"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "jimp": "^0.22.12",
+    "png-to-ico": "^2.1.8"
+  }
+}
