@@ -184,7 +184,18 @@ function spinner(text) {
 
 
 // ---------- gradient colors (matched to the Snailshell logo: electric blue -> cyan -> ice white) ----------
-const TRUECOLOR = /truecolor|24bit/i.test(process.env.COLORTERM || '') || !!process.env.WT_SESSION || process.env.TERM_PROGRAM === 'vscode' || process.env.TERM_PROGRAM === 'iTerm.app';
+// Truecolor detection. SSH usually does NOT forward COLORTERM, so on Linux we also trust modern terminal names.
+// Force a mode with SNAILSHELL_COLOR=truecolor or SNAILSHELL_COLOR=256.
+const TRUECOLOR = (() => {
+  const mode = String(process.env.SNAILSHELL_COLOR || '').toLowerCase();
+  if (mode === 'truecolor' || mode === '24bit') return true;
+  if (mode === '256') return false;
+  const e = process.env, term = e.TERM || '';
+  if (/truecolor|24bit/i.test(e.COLORTERM || '') || e.WT_SESSION || e.KITTY_WINDOW_ID || e.WEZTERM_EXECUTABLE) return true;
+  if (['vscode', 'iTerm.app', 'WezTerm', 'Hyper', 'ghostty'].includes(e.TERM_PROGRAM)) return true;
+  if (process.platform === 'linux' && term !== 'linux' && /^(xterm|screen|tmux|alacritty|kitty|foot|rxvt|vte|konsole|st-)/i.test(term)) return true;
+  return false;
+})();
 const PALETTE = [[11, 145, 255], [40, 185, 255], [110, 220, 255], [234, 245, 255], [110, 220, 255], [60, 120, 255], [95, 90, 240], [60, 120, 255], [11, 145, 255]];
 const P256 = [27, 33, 39, 45, 81, 117, 153, 195, 153, 117, 81, 45, 39, 33];
 function gradRGB(t) {                                   // t: any number, wraps 0..1
@@ -306,12 +317,13 @@ function printLogo(pkgRoot, version) {
   ];
   let sideDone = false;
   console.log('');
-  if (useColor && cols >= 70) {
-    const file = path.join(assets, TRUECOLOR ? 'logo.truecolor.ansi' : (has256 ? 'logo.256.ansi' : null) || 'logo.256.ansi');
+  if (useColor && cols >= 40 && (TRUECOLOR || has256)) {
+    const big = cols >= 70;
+    const file = path.join(assets, `logo.${big ? '' : 'small.'}${TRUECOLOR ? 'truecolor' : '256'}.ansi`);
     try {
       const lines = fs.readFileSync(file, 'utf8').replace(/\s+$/, '').split(/\r?\n/);
       const width = Math.max(...lines.map((l) => strip(l).length));
-      if (cols >= width + 4 + 24) {                       // wide terminal: put the credit beside the logo
+      if (big && cols >= width + 4 + 24) {                // wide terminal: put the credit beside the logo
         const at = lines.length - 6;                      // lower right, next to the snail's body
         const out = lines.map((l, i) => {
           const c = credit[i - at];

@@ -4,13 +4,40 @@
 
 Build a real desktop app (Windows `.exe`, Linux `.AppImage`, macOS `.app`) from any folder of HTML/CSS/JS, right from your terminal.
 
-## Install
+## Quick start (one line)
+
+**Windows (PowerShell / CMD), macOS, Linux - no install:**
 ```bash
-npm install -g .          # inside this folder  → command: snailshell
-npx .                     # or run without installing
-# after you publish to npm:  npx snailshell
+npx github:OpenMalwhere/snailshell
 ```
-Needs Node.js 18+.
+
+**Install once, then use the `snailshell` command anywhere:**
+```bash
+# Windows / macOS
+npm install -g github:OpenMalwhere/snailshell
+
+# Linux (global install needs sudo on most distros)
+sudo npm install -g github:OpenMalwhere/snailshell
+```
+Then just run:
+```bash
+snailshell
+```
+
+**Linux with sudo (only if you really want it):**
+```bash
+sudo npx github:OpenMalwhere/snailshell
+```
+> Prefer the commands above without `sudo npx`. Running the wizard as root saves your apps in `/root/SnailshellApps`
+> and the engine in `/root/.snailshell` (owned by root), so your normal user can't edit them later.
+> Use `sudo` only for the global install line.
+
+**From a downloaded copy of this folder:**
+```bash
+npm install -g .      # inside this folder  → command: snailshell
+npx .                 # or run without installing
+```
+Update to the newest version any time: run the same install line again. Needs Node.js 18+.
 
 ## What it does
 1. **Checks your OS** and, on first run, downloads the matching Electron + build tools into `~/.snailshell/engine`.
@@ -53,3 +80,12 @@ Developer Mode (Settings → System → For developers) or run the terminal as A
 - **Windows from Linux/macOS** works out of the box. On x64 you get a single portable `.exe` plus a `.zip`; on ARM (e.g. Kali arm64) you get the `.zip` (unzip it on Windows and run the `.exe` inside).
 - **Linux from Windows/macOS** uses Docker if it is installed (`electronuserland/builder` image).
 - **macOS** apps need a Mac (or the included GitHub Actions workflow).
+
+## Colors look different over SSH / on Linux?
+Snailshell uses the full-color (24-bit) logo when the terminal supports it. Over SSH the terminal often does not say so.
+Force it with:
+```bash
+SNAILSHELL_COLOR=truecolor snailshell     # full-color logo
+SNAILSHELL_COLOR=256 snailshell           # for older terminals
+```
+(PowerShell: `$env:SNAILSHELL_COLOR="truecolor"; snailshell`)
