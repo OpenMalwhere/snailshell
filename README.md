@@ -6,6 +6,11 @@ Build a real desktop app (Windows `.exe`, Linux `.AppImage`, macOS `.app`) from 
 
 ## Install
 ```bash
+npm install -g github:OpenMalwhere/snailshell # direct install (windows os)
+sudo npm install -g github:OpenMalwhere/snailshell # direct install (linux os)
+
+            [or]
+            
 npm install -g .          # inside this folder  → command: snailshell
 npx .                     # or run without installing
 # after you publish to npm:  npx snailshell
