@@ -2,11 +2,35 @@
   "name": "snailshell",
   "version": "1.0.0",
   "description": "Snailshell - build desktop apps (Windows / Linux / macOS) from any HTML interface folder, right from your terminal.",
-  "bin": { "snailshell": "bin/snailshell.js" },
-  "files": ["bin", "src", "engine", "templates", "assets", "README.md"],
-  "engines": { "node": ">=18" },
-  "keywords": ["cli", "electron", "desktop", "app-builder", "snailshell"],
+  "bin": {
+    "snailshell": "bin/snailshell.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "engine",
+    "templates",
+    "assets",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cli",
+    "electron",
+    "desktop",
+    "app-builder",
+    "snailshell"
+  ],
   "author": "OpenMalwhere (https://github.com/OpenMalwhere)",
-  "homepage": "https://github.com/OpenMalwhere",
-  "license": "MIT"
+  "homepage": "https://github.com/OpenMalwhere/snailshell",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenMalwhere/snailshell.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OpenMalwhere/snailshell/issues"
+  }
 }

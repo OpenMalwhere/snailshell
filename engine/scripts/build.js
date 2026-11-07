@@ -4,7 +4,10 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const ifaceDir = path.join(root, 'interface');
 const { readAppName, fileSafe, findIcon, DEFAULT_ICON } = require('../shellinfo');
-const plat = process.platform; // win32 | linux | darwin
+const plat = process.platform; // OS we run on: win32 | linux | darwin
+// OS we build FOR (SNAILSHELL_TARGET=windows|linux|macos). Differs from `plat` = cross-build.
+const want = ({ windows: 'win32', win32: 'win32', linux: 'linux', macos: 'darwin', darwin: 'darwin' })[String(process.env.SNAILSHELL_TARGET || '').toLowerCase()] || plat;
+const cross = want !== plat;
 process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';      // never try to code-sign
 
 // Windows without Developer Mode/Admin cannot create symlinks. electron-builder's "winCodeSign" download contains two
@@ -62,12 +65,12 @@ async function makeIco(src, out) {                      // multi-size .ico (Wind
   const appName = readAppName(ifaceDir);
   const exeName = fileSafe(appName);
   let iconSrc = findIcon(ifaceDir) || DEFAULT_ICON;
-  if (plat !== 'win32' && path.extname(iconSrc).toLowerCase() === '.ico') {
+  if (want !== 'win32' && path.extname(iconSrc).toLowerCase() === '.ico') {
     console.log('Note: .ico icons only work for Windows builds - use icon.png. Using the default icon here.');
     iconSrc = DEFAULT_ICON;
   }
 
-  console.log('Platform :', plat);
+  console.log('Platform :', plat + (cross ? ' -> building for ' + want : ''));
   console.log('App name :', appName, '->', exeName);
   console.log('Icon     :', iconSrc === DEFAULT_ICON ? '(default Snailshell icon)' : iconSrc);
 
@@ -88,20 +91,25 @@ async function makeIco(src, out) {                      // multi-size .ico (Wind
   };
   let targets, config;
 
-  if (plat === 'win32') {
+  if (want === 'win32') {
     const ico = path.join(tmp, 'icon.ico'); await makeIco(iconSrc, ico);
-    targets = builder.Platform.WINDOWS.createTarget(['dir', 'portable']);
-    config = { ...base, win: { icon: ico, target: ['dir', 'portable'], signAndEditExecutable: process.env.SNAILSHELL_NO_EDIT !== '1' }, portable: { artifactName: exeName + '.exe' } };
-  } else if (plat === 'linux') {
+    // Cross-build from Linux/macOS: no Wine, so the exe's own icon can't be edited (signAndEditExecutable:false).
+    // 'zip' always works; the single-file 'portable' .exe needs the x64 NSIS tools, so only try it on x64 hosts.
+    const list = !cross ? ['dir', 'portable'] : (process.arch === 'x64' ? ['dir', 'portable', 'zip'] : ['dir', 'zip']);
+    targets = builder.Platform.WINDOWS.createTarget(list, ...(cross ? [builder.Arch.x64] : []));
+    config = { ...base, win: { icon: ico, target: list, artifactName: exeName + '-windows.${ext}', signAndEditExecutable: !cross && process.env.SNAILSHELL_NO_EDIT !== '1' }, portable: { artifactName: exeName + '.exe' } };
+  } else if (want === 'linux') {
+    if (cross) throw new Error('A Linux app (.AppImage) cannot be built on ' + plat + '. Use Docker, WSL or GitHub Actions (see the README).');
     const png = path.join(tmp, 'icon.png'); await makePng(iconSrc, png);
     targets = builder.Platform.LINUX.createTarget(['dir', 'AppImage']);
     config = { ...base, linux: { icon: png, category: 'Utility', target: ['dir', 'AppImage'], executableName: exeName },
                appImage: { artifactName: exeName + '.AppImage' } };
-  } else if (plat === 'darwin') {
+  } else if (want === 'darwin') {
+    if (cross) throw new Error('A macOS app cannot be built on ' + plat + ' (needs Apple tools). Use a Mac or GitHub Actions (see the README).');
     const png = path.join(tmp, 'icon.png'); await makePng(iconSrc, png);
     targets = builder.Platform.MAC.createTarget(['dir']);
     config = { ...base, mac: { icon: png, category: 'public.app-category.utilities', target: ['dir'], identity: null } };
-  } else { throw new Error('Unsupported platform: ' + plat); }
+  } else { throw new Error('Unsupported platform: ' + want); }
 
   try {
     await builder.build({ targets, config, publish: 'never' });
@@ -119,6 +127,14 @@ async function makeIco(src, out) {                      // multi-size .ico (Wind
   for (const d of fs.readdirSync(dist, { withFileTypes: true }))
     if (d.isDirectory() && (d.name.endsWith('-unpacked') || d.name.startsWith('mac'))) dests.push(path.join(dist, d.name, 'interface'));
   for (const dest of dests) { fs.rmSync(dest, { recursive: true, force: true }); fs.cpSync(ifaceDir, dest, { recursive: true }); }
+  if (want === 'win32' && cross) {                       // zip again, now that interface/ is inside win-unpacked
+    const zip = path.join(dist, exeName + '-windows.zip'), src = path.join(dist, 'win-unpacked');
+    if (fs.existsSync(src)) {
+      try { fs.rmSync(zip, { force: true }); } catch {}
+      const r = require('child_process').spawnSync(require('7zip-bin').path7za, ['a', '-tzip', '-mx=5', '-bd', zip, '.'], { cwd: src, encoding: 'utf8' });
+      if (r.status !== 0) console.log('Warning: could not rebuild the zip:', (r.stdout || '') + (r.stderr || ''));
+    }
+  }
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
 
   console.log('\nDone! Look in the dist/ folder. Keep the "interface" folder next to the app.');

@@ -6,11 +6,6 @@ Build a real desktop app (Windows `.exe`, Linux `.AppImage`, macOS `.app`) from 
 
 ## Install
 ```bash
-npm install -g github:OpenMalwhere/snailshell # direct install (windows os)
-sudo npm install -g github:OpenMalwhere/snailshell # direct install (linux os)
-
-            [or]
-            
 npm install -g .          # inside this folder  → command: snailshell
 npx .                     # or run without installing
 # after you publish to npm:  npx snailshell
@@ -47,3 +42,14 @@ Desktop apps must be built **on their own OS**. If you pick another OS than the 
 Windows blocks symlinks unless Developer Mode or Administrator is on. Snailshell now repairs this automatically
 (it unpacks electron-builder's signing tools without the macOS-only links and retries). If it still fails, turn on
 Developer Mode (Settings → System → For developers) or run the terminal as Administrator.
+
+## Building for another OS
+| You are on | Windows app | Linux app | macOS app |
+|---|---|---|---|
+| Windows | ✅ native | 🐳 Docker | GitHub Actions / a Mac |
+| Linux | ✅ cross-build (.exe + .zip, no Wine) | ✅ native | GitHub Actions / a Mac |
+| macOS | ✅ cross-build | 🐳 Docker | ✅ native |
+
+- **Windows from Linux/macOS** works out of the box. On x64 you get a single portable `.exe` plus a `.zip`; on ARM (e.g. Kali arm64) you get the `.zip` (unzip it on Windows and run the `.exe` inside).
+- **Linux from Windows/macOS** uses Docker if it is installed (`electronuserland/builder` image).
+- **macOS** apps need a Mac (or the included GitHub Actions workflow).

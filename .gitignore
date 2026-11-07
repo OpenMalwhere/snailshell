@@ -2,6 +2,5 @@ node_modules/
 dist/
 build-temp/
 *.log
-.idea/
 .DS_Store
 Thumbs.db

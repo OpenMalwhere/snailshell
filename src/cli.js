@@ -215,13 +215,17 @@ function findArtifacts(distDir, target, exeName) {
   const out = [];
   if (!fs.existsSync(distDir)) return out;
   for (const e of fs.readdirSync(distDir, { withFileTypes: true })) {
-    if (target.key === 'windows' && e.isFile() && e.name.endsWith('.exe')) out.push(path.join(distDir, e.name));
+    if (target.key === 'windows' && e.isFile() && (e.name.endsWith('.exe') || e.name.endsWith('-windows.zip'))) out.push(path.join(distDir, e.name));
     if (target.key === 'linux' && e.isFile() && e.name.endsWith('.AppImage')) out.push(path.join(distDir, e.name));
     if (target.key === 'macos' && e.isDirectory() && e.name.startsWith('mac')) {
       for (const a of fs.readdirSync(path.join(distDir, e.name))) if (a.endsWith('.app')) out.push(path.join(distDir, e.name, a));
     }
   }
   return out;
+}
+function dockerAvailable() {
+  try { return require('child_process').spawnSync('docker', ['info'], { shell: true, stdio: 'ignore', timeout: 15000 }).status === 0; }
+  catch { return false; }
 }
 function openFolder(p) {
   const cmd = process.platform === 'win32' ? 'explorer' : process.platform === 'darwin' ? 'open' : 'xdg-open';
@@ -351,21 +355,30 @@ async function testRun(ifaceDir, sys) {
 // ---------- generate the real app ----------
 async function buildApp({ sys, target, native, projectDir, ifaceDir, exeName }) {
   const hostName = sys.host.label.replace(' app', '');
+  let viaDocker = false, crossWin = false;
   if (!native) {
     const want = target.label.replace(' app', '');
-    ui.box(`${want} apps can't be built on ${hostName}`, [
-      `The packager needs ${want}'s own system tools to create ${target.ext}, so each desktop app must be built on its own OS.`,
-      '',
-      color.bold('Your options'),
-      `  • Build the ${hostName} app on this PC (instant)`,
-      `  • GitHub Actions: push the project, run the "build" workflow, download the ${want} app`,
-      `  • Copy the project to a ${want} computer and run build.${target.key === 'windows' ? 'bat' : 'sh'}`,
-    ], 'yellow');
-    if (ui.isTTY && await ui.confirm(`Build the ${hostName} app for this computer now instead?`)) {
-      target = sys.host; native = true;
-    } else {
-      ui.info(`Project ready: ${projectDir}`);
-      return;
+    if (target.key === 'windows') {
+      crossWin = true;                                    // works from Linux/macOS without Wine
+      ui.info(`Cross-building the Windows app on ${hostName} - no Windows PC needed.`);
+    } else if (target.key === 'linux' && dockerAvailable()) {
+      if (ui.isTTY && await ui.confirm(`Build the Linux app inside Docker (first run downloads ~1 GB)?`)) viaDocker = true;
+    }
+    if (!crossWin && !viaDocker) {
+      ui.box(`${want} apps can't be built directly on ${hostName}`, [
+        `The packager needs ${want}'s own system tools to create ${target.ext}.`,
+        '',
+        color.bold('Your options'),
+        `  • Build the ${hostName} app on this PC (instant)`,
+        target.key === 'linux' ? '  • Install Docker, then run snailshell again - it builds the Linux app in a container' : `  • Copy the project to a ${want} computer and run build.${target.key === 'windows' ? 'bat' : 'sh'}`,
+        `  • GitHub Actions: push the project, run the "build" workflow, download the ${want} app`,
+      ], 'yellow');
+      if (ui.isTTY && await ui.confirm(`Build the ${hostName} app for this computer now instead?`)) {
+        target = sys.host; native = true;
+      } else {
+        ui.info(`Project ready: ${projectDir}`);
+        return;
+      }
     }
   }
 
@@ -373,7 +386,17 @@ async function buildApp({ sys, target, native, projectDir, ifaceDir, exeName }) 
   fs.rmSync(stage, { recursive: true, force: true });
   copyInterface(ifaceDir, stage);
   ui.ok('Interface staged into the build engine');
-  const r = await engine.run('npm', ['run', 'build'], { cwd: engine.ENGINE_DIR, label: `Packaging ${exeName}${target.ext} (first build downloads packaging tools, please wait)` });
+  const label = `Packaging ${exeName}${crossWin ? '.exe + .zip' : target.ext} (first build downloads packaging tools, please wait)`;
+  let r, buildDir = engine.ENGINE_DIR;
+  if (viaDocker) {
+    buildDir = fs.mkdtempSync(path.join(os.tmpdir(), 'snailshell-docker-'));
+    engine.copyTree(engine.ENGINE_SRC, buildDir);
+    copyInterface(ifaceDir, path.join(buildDir, 'interface'));
+    r = await engine.run('docker', ['run', '--rm', '-v', `"${buildDir}:/project"`, '-w', '/project', 'electronuserland/builder:latest',
+      'bash', '-c', '"npm install --no-audit --no-fund --loglevel=error && npm run build"'], { cwd: buildDir, label: `Packaging ${exeName}${target.ext} in Docker (first run downloads the builder image)` });
+  } else {
+    r = await engine.run('npm', ['run', 'build'], { cwd: engine.ENGINE_DIR, label, env: crossWin ? { SNAILSHELL_TARGET: 'windows' } : {} });
+  }
   if (r.code !== 0) {
     const sym = /symbolic link|required privilege|SYMLINK_BLOCKED/i.test(r.text);
     const lines = sym && process.platform === 'win32' ? [
@@ -397,7 +420,8 @@ async function buildApp({ sys, target, native, projectDir, ifaceDir, exeName }) 
   }
   const distOut = path.join(projectDir, 'dist');
   fs.rmSync(distOut, { recursive: true, force: true });
-  fs.cpSync(path.join(engine.ENGINE_DIR, 'dist'), distOut, { recursive: true });
+  fs.cpSync(path.join(buildDir, 'dist'), distOut, { recursive: true });
+  if (viaDocker) { try { fs.rmSync(buildDir, { recursive: true, force: true }); } catch { /* ignore */ } }
   const arts = findArtifacts(distOut, target, exeName);
 
   ui.box('Your app is ready', [
@@ -406,6 +430,7 @@ async function buildApp({ sys, target, native, projectDir, ifaceDir, exeName }) 
     color.gray('Project   ') + projectDir,
     '',
     color.gray('Keep the "interface" folder next to the app. Edit it any time - no rebuild needed.'),
+    ...(crossWin ? [color.gray(`Built on ${hostName}: works on 64-bit Windows 10/11. Explorer may show the default icon on the .exe file itself; your icon is used in the app.`)] : []),
   ], 'green');
   if (ui.isTTY) {
     const act = await ui.select('What next?', [
